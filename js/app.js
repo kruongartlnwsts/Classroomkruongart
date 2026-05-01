@@ -1,4 +1,4 @@
-﻿        let globalData = { classes: [], students: [], subjects: [], assignments: [], submissions: [], worksheets: [], config: [] };
+        let globalData = { classes: [], students: [], subjects: [], assignments: [], submissions: [], worksheets: [], config: [] };
         let isAdmin = false;
         
         // --- ตัวแปรสำหรับ Pagination & Auto-Refresh ---
@@ -1786,4 +1786,3 @@
                 }
             });
         }
-    </script>
