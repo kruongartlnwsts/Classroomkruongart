@@ -95,7 +95,7 @@
                         loadSubmissionsForAdmin(); // Refresh Grading Table
                     }
                 } catch (e) { console.error("UI Error:", e); showError("เกิดข้อผิดพลาดในการแสดงผล: " + e.message); }
-            }).withFailureHandler((e) => { showLoading(false); console.error("Server Error:", e); showError("ไม่สามารถเชื่อมต่อฐานข้อมูลได้: " + e.message); }).getAllData();
+            }).withFailureHandler((e) => { showLoading(false); console.error("Server Error:", e); showError("ไม่สามารถเชื่อมต่อฐานข้อมูลได้ [NEW]: " + e.message); }).getAllData();
         }
 
         function showError(msg) {
