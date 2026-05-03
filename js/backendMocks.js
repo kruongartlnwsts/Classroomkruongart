@@ -17,7 +17,7 @@ window.google = {
                     'updateMultipleScoresAndFeedback', 'updateMultipleScores',
                     'saveGeminiKey', 'saveFolderID', 'changePassword', 'analyzeSubmissionWithGemini',
                     'generateReport', 'saveMultipleQuestions', 'addClass', 'addStudent', 'importCSV',
-                    'updatePassword', 'addRow'
+                    'updatePassword', 'addRow', 'updateFolderId', 'updateGeminiApiKey'
                 ];
 
                 methods.forEach(method => {
@@ -230,7 +230,17 @@ const backendMocks = {
         return "Imported";
     },
 
-    saveFolderID: async (id) => { return "Success"; },
+    updateFolderId: async (id) => {
+        const { error } = await supabaseClient.from('config').upsert({ key: 'root_folder_id', value: id });
+        if(error) throw new Error(error.message);
+        return "Success";
+    },
+    updateGeminiApiKey: async (key) => {
+        const { error } = await supabaseClient.from('config').upsert({ key: 'gemini_api_key', value: key });
+        if(error) throw new Error(error.message);
+        return "Success";
+    },
+    saveFolderID: async (id) => { return await backendMocks.updateFolderId(id); },
     saveGeminiKey: async (key) => {
         const { error } = await supabaseClient.from('config').upsert({ key: 'gemini_api_key', value: key });
         if(error) throw new Error(error.message);
