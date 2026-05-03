@@ -41,7 +41,7 @@ window.google = {
 const backendMocks = {
     getAllData: async () => {
         const fetchTable = async (table) => {
-            const { data, error } = await supabase.from(table).select('*');
+            const { data, error } = await supabaseClient.from(table).select('*');
             if (error) { console.error('Error fetching ' + table, error); return []; }
             return data;
         };
@@ -67,25 +67,25 @@ const backendMocks = {
     },
     
     checkAdminPassword: async (inputPass) => {
-        const { data } = await supabase.from('config').select('value').eq('key', 'admin_password').single();
+        const { data } = await supabaseClient.from('config').select('value').eq('key', 'admin_password').single();
         return data && data.value === inputPass;
     },
     
     changePassword: async (newPass) => {
-        const { error } = await supabase.from('config').upsert({ key: 'admin_password', value: newPass });
+        const { error } = await supabaseClient.from('config').upsert({ key: 'admin_password', value: newPass });
         if(error) throw new Error(error.message);
         return true;
     },
 
     uploadSubmission: async (formObject) => {
-        const { data: existing } = await supabase.from('submissions')
+        const { data: existing } = await supabaseClient.from('submissions')
             .select('id')
             .eq('assignment_id', formObject.assignmentId)
             .eq('student_id', formObject.studentId);
         
         if (existing && existing.length > 0) return "ERROR_DUPLICATE";
 
-        const { data: assign } = await supabase.from('assignments').select('due_date').eq('id', formObject.assignmentId).single();
+        const { data: assign } = await supabaseClient.from('assignments').select('due_date').eq('id', formObject.assignmentId).single();
         if (assign && assign.due_date) {
             const dueDate = new Date(assign.due_date);
             dueDate.setHours(23, 59, 59, 999);
@@ -98,15 +98,15 @@ const backendMocks = {
         const base64Response = await fetch(formObject.fileData);
         const blob = await base64Response.blob();
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
             .from('submissions')
             .upload(pathName, blob, { upsert: true });
 
         if (uploadError) throw new Error(uploadError.message);
 
-        const { data: publicUrlData } = supabase.storage.from('submissions').getPublicUrl(pathName);
+        const { data: publicUrlData } = supabaseClient.storage.from('submissions').getPublicUrl(pathName);
 
-        const { error: insertError } = await supabase.from('submissions').insert({
+        const { error: insertError } = await supabaseClient.from('submissions').insert({
             assignment_id: formObject.assignmentId,
             student_id: formObject.studentId,
             file_url: publicUrlData.publicUrl
@@ -119,9 +119,9 @@ const backendMocks = {
     saveWorksheet: async (id, title, subjectId, classId, driveLink, description) => {
         const payload = { title, subject_id: subjectId, class_id: classId, drive_link: driveLink, description };
         if (id) {
-            await supabase.from('worksheets').update(payload).eq('id', id);
+            await supabaseClient.from('worksheets').update(payload).eq('id', id);
         } else {
-            await supabase.from('worksheets').insert(payload);
+            await supabaseClient.from('worksheets').insert(payload);
         }
         return "Success";
     },
@@ -135,16 +135,16 @@ const backendMocks = {
         const table = tableMap[sheetName];
         if (!table) return "Not Found";
         
-        await supabase.from(table).delete().eq('id', value);
+        await supabaseClient.from(table).delete().eq('id', value);
         return "Deleted";
     },
 
     saveExam: async (id, title, subjectId, classId, maxQuestions, active) => {
         const payload = { title, subject_id: subjectId, class_id: classId, max_questions: maxQuestions, active: active === 'Active' };
         if (id) {
-            await supabase.from('exams').update(payload).eq('id', id);
+            await supabaseClient.from('exams').update(payload).eq('id', id);
         } else {
-            await supabase.from('exams').insert(payload);
+            await supabaseClient.from('exams').insert(payload);
         }
         return "Success";
     },
@@ -152,69 +152,69 @@ const backendMocks = {
     saveQuestion: async (examId, qId, qText, optA, optB, optC, optD, ans) => {
         const payload = { exam_id: examId, question_text: qText, option_a: optA, option_b: optB, option_c: optC, option_d: optD, answer: ans };
         if (qId) {
-            await supabase.from('questions').update(payload).eq('id', qId);
+            await supabaseClient.from('questions').update(payload).eq('id', qId);
         } else {
-            await supabase.from('questions').insert(payload);
+            await supabaseClient.from('questions').insert(payload);
         }
         return "Success";
     },
 
     submitExam: async (examId, studentId, score) => {
-        const { data: existing } = await supabase.from('exam_results').select('id').eq('exam_id', examId).eq('student_id', studentId);
+        const { data: existing } = await supabaseClient.from('exam_results').select('id').eq('exam_id', examId).eq('student_id', studentId);
         if (existing && existing.length > 0) return "ERROR_LOCKED";
 
-        await supabase.from('exam_results').insert({ exam_id: examId, student_id: studentId, score: score, is_locked: true });
+        await supabaseClient.from('exam_results').insert({ exam_id: examId, student_id: studentId, score: score, is_locked: true });
         return "Success";
     },
 
     unlockExam: async (resultId) => {
-        await supabase.from('exam_results').delete().eq('id', resultId);
+        await supabaseClient.from('exam_results').delete().eq('id', resultId);
         return "Success";
     },
 
     deleteSubmission: async (submissionId) => {
-        await supabase.from('submissions').delete().eq('id', submissionId);
+        await supabaseClient.from('submissions').delete().eq('id', submissionId);
         return "Deleted";
     },
 
     addAssignment: async (title, subjectId, classId, dueDate) => {
-        await supabase.from('assignments').insert({ title, subject_id: subjectId, class_id: classId, due_date: dueDate || null });
+        await supabaseClient.from('assignments').insert({ title, subject_id: subjectId, class_id: classId, due_date: dueDate || null });
         return "Success";
     },
 
     updateAssignment: async (id, title, subjectId, classId, dueDate) => {
-        await supabase.from('assignments').update({ title, subject_id: subjectId, class_id: classId, due_date: dueDate || null }).eq('id', id);
+        await supabaseClient.from('assignments').update({ title, subject_id: subjectId, class_id: classId, due_date: dueDate || null }).eq('id', id);
         return "Updated";
     },
 
     updateScore: async (submissionId, score, feedback) => {
         const payload = { score };
         if (feedback !== undefined) payload.feedback = feedback;
-        await supabase.from('submissions').update(payload).eq('id', submissionId);
+        await supabaseClient.from('submissions').update(payload).eq('id', submissionId);
         return "Updated";
     },
 
     updateMultipleScoresAndFeedback: async (updates) => {
         for (const update of updates) {
-            await supabase.from('submissions').update({ score: update.score, feedback: update.feedback }).eq('id', update.id);
+            await supabaseClient.from('submissions').update({ score: update.score, feedback: update.feedback }).eq('id', update.id);
         }
         return "Batch Updated";
     },
     
     updateMultipleScores: async (updates) => {
         for (const update of updates) {
-            await supabase.from('submissions').update({ score: update.score }).eq('id', update.id);
+            await supabaseClient.from('submissions').update({ score: update.score }).eq('id', update.id);
         }
         return "Batch Updated";
     },
 
     addClass: async (name) => {
-        await supabase.from('classes').insert({ name });
+        await supabaseClient.from('classes').insert({ name });
         return "Success";
     },
 
     addStudent: async (classId, name) => {
-        await supabase.from('students').insert({ class_id: classId, name });
+        await supabaseClient.from('students').insert({ class_id: classId, name });
         return "Success";
     },
 
@@ -225,13 +225,13 @@ const backendMocks = {
             const name = row.trim();
             if(name) inserts.push({ name, class_id: classId });
         });
-        if(inserts.length > 0) await supabase.from('students').insert(inserts);
+        if(inserts.length > 0) await supabaseClient.from('students').insert(inserts);
         return "Imported";
     },
 
     saveFolderID: async (id) => { return "Success"; },
     saveGeminiKey: async (key) => {
-        const { error } = await supabase.from('config').upsert({ key: 'gemini_api_key', value: key });
+        const { error } = await supabaseClient.from('config').upsert({ key: 'gemini_api_key', value: key });
         if(error) throw new Error(error.message);
         return "Success";
     },
@@ -240,7 +240,7 @@ const backendMocks = {
         const inserts = questionsData.map(q => ({
             exam_id: examId, question_text: q.text, option_a: q.a, option_b: q.b, option_c: q.c, option_d: q.d, answer: q.ans
         }));
-        await supabase.from('questions').insert(inserts);
+        await supabaseClient.from('questions').insert(inserts);
         return "Success";
     },
 
