@@ -55,9 +55,10 @@ const backendMocks = {
 
         const transform = (raw, mapping) => raw.map(item => mapping.map(key => {
             let val = item[key];
+            if ((key === 'is_active' || key === 'is_locked') && val === true) return 'Active';
+            if ((key === 'is_active' || key === 'is_locked') && val === false) return 'Inactive';
             if (val && (key === 'created_at' || key === 'due_date')) {
-                // Format date as YYYY-MM-DD
-                return new Date(val).toISOString().split('T')[0];
+                try { return new Date(val).toISOString().split('T')[0]; } catch(e) { return val; }
             }
             return val !== undefined ? val : "";
         }));
@@ -98,33 +99,31 @@ const backendMocks = {
 
         const { data: assign, error: assignError } = await supabaseClient.from('assignments').select('due_date').eq('id', formObject.assignmentId).maybeSingle();
         if (assignError || !assign) { console.error("Assignment not found"); return "Error: Assignment not found"; }
-        if (assign && assign.due_date) {
-            const dueDate = new Date(assign.due_date);
-            dueDate.setHours(23, 59, 59, 999);
-            if (new Date() > dueDate) return "ERROR_LATE";
-        }
 
-        // Upload to Google Drive via GAS Web App
-        const gasResponse = await fetch(window.GAS_WEB_APP_URL, {
+        // Logic for Drive Upload (handled via backend script proxy)
+        const response = await fetch(window.GAS_WEB_APP_URL, {
             method: 'POST',
             body: JSON.stringify({
-                action: 'uploadFile',
-                formObject: formObject
+                action: 'uploadFileOnly',
+                fileData: formObject.fileData,
+                fileName: formObject.fileName,
+                studentName: formObject.studentName,
+                className: formObject.className,
+                assignmentTitle: formObject.assignmentTitle
             })
         });
-
-        const gasResult = await gasResponse.json();
-        if (gasResult.error) throw new Error(gasResult.error);
-
-        // Save metadata to Supabase
-        const { error: insertError } = await supabaseClient.from('submissions').insert({
-            assignment_id: formObject.assignmentId,
-            student_id: formObject.studentId,
-            file_url: gasResult.url
-        });
-
-        if (insertError) throw new Error(insertError.message);
-        return "Success";
+        const driveRes = await response.json();
+        
+        if (driveRes.status === 'success') {
+            await supabaseClient.from('submissions').insert({
+                id: 'SUB' + Date.now(),
+                assignment_id: formObject.assignmentId,
+                student_id: formObject.studentId,
+                file_url: driveRes.url
+            });
+            return "Success";
+        }
+        return "Error Uploading to Drive";
     },
 
     saveWorksheet: async (id, title, subjectId, classId, driveLink, description) => {
@@ -132,7 +131,8 @@ const backendMocks = {
         if (id) {
             await supabaseClient.from('worksheets').update(payload).eq('id', id);
         } else {
-            await supabaseClient.from('worksheets').insert(payload);
+            const newId = 'W' + Date.now();
+            await supabaseClient.from('worksheets').insert({ id: newId, ...payload });
         }
         return "Success";
     },
@@ -151,11 +151,12 @@ const backendMocks = {
     },
 
     saveExam: async (id, title, subjectId, classId, maxQuestions, active) => {
-        const payload = { title, subject_id: subjectId, class_id: classId, max_questions: maxQuestions, active: active === 'Active' };
+        const payload = { title, subject_id: subjectId, class_id: classId, max_questions: maxQuestions, is_active: active === 'Active' };
         if (id) {
             await supabaseClient.from('exams').update(payload).eq('id', id);
         } else {
-            await supabaseClient.from('exams').insert(payload);
+            const newId = 'E' + Date.now();
+            await supabaseClient.from('exams').insert({ id: newId, ...payload });
         }
         return "Success";
     },
@@ -165,7 +166,8 @@ const backendMocks = {
         if (qId) {
             await supabaseClient.from('questions').update(payload).eq('id', qId);
         } else {
-            await supabaseClient.from('questions').insert(payload);
+            const newId = 'Q' + Date.now();
+            await supabaseClient.from('questions').insert({ id: newId, ...payload });
         }
         return "Success";
     },
@@ -174,7 +176,8 @@ const backendMocks = {
         const { data: existing } = await supabaseClient.from('exam_results').select('id').eq('exam_id', examId).eq('student_id', studentId);
         if (existing && existing.length > 0) return "ERROR_LOCKED";
 
-        await supabaseClient.from('exam_results').insert({ exam_id: examId, student_id: studentId, score: score, is_locked: true });
+        const newId = 'RES' + Date.now();
+        await supabaseClient.from('exam_results').insert({ id: newId, exam_id: examId, student_id: studentId, score: score, is_locked: true });
         return "Success";
     },
 
@@ -189,7 +192,8 @@ const backendMocks = {
     },
 
     addAssignment: async (title, subjectId, classId, dueDate) => {
-        await supabaseClient.from('assignments').insert({ title, subject_id: subjectId, class_id: classId, due_date: dueDate || null });
+        const newId = 'A' + Date.now();
+        await supabaseClient.from('assignments').insert({ id: newId, title, subject_id: subjectId, class_id: classId, due_date: dueDate || null });
         return "Success";
     },
 
@@ -220,12 +224,14 @@ const backendMocks = {
     },
 
     addClass: async (name) => {
-        await supabaseClient.from('classes').insert({ name });
+        const newId = 'C' + Date.now();
+        await supabaseClient.from('classes').insert({ id: newId, name });
         return "Success";
     },
 
     addStudent: async (classId, name) => {
-        await supabaseClient.from('students').insert({ class_id: classId, name });
+        const newId = 'S' + Date.now();
+        await supabaseClient.from('students').insert({ id: newId, class_id: classId, name });
         return "Success";
     },
 
@@ -234,7 +240,10 @@ const backendMocks = {
         const inserts = [];
         rows.forEach(row => {
             const name = row.trim();
-            if(name) inserts.push({ name, class_id: classId });
+            if(name) {
+                const newId = 'S' + Date.now() + Math.random().toString(36).substr(2, 5);
+                inserts.push({ id: newId, name, class_id: classId });
+            }
         });
         if(inserts.length > 0) await supabaseClient.from('students').insert(inserts);
         return "Imported";
@@ -259,6 +268,7 @@ const backendMocks = {
 
     saveMultipleQuestions: async (examId, questionsData) => {
         const inserts = questionsData.map(q => ({
+            id: 'Q' + Date.now() + Math.random().toString(36).substr(2, 5),
             exam_id: examId, question_text: q.text, option_a: q.a, option_b: q.b, option_c: q.c, option_d: q.d, answer: q.ans
         }));
         await supabaseClient.from('questions').insert(inserts);
@@ -267,20 +277,21 @@ const backendMocks = {
 
     addRow: async (tableName, rowData) => {
         if (tableName === 'Classes') {
-            await supabaseClient.from('classes').insert({ name: rowData[1] });
+            await supabaseClient.from('classes').insert({ id: rowData[0], name: rowData[1] });
         } else if (tableName === 'Students') {
-            await supabaseClient.from('students').insert({ name: rowData[1], class_id: rowData[2] });
+            await supabaseClient.from('students').insert({ id: rowData[0], name: rowData[1], class_id: rowData[2] });
         } else if (tableName === 'Subjects') {
-            await supabaseClient.from('subjects').insert({ name: rowData[1] });
+            await supabaseClient.from('subjects').insert({ id: rowData[0], name: rowData[1] });
         } else if (tableName === 'Worksheets') {
             await supabaseClient.from('worksheets').insert({ 
-                title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
+                id: rowData[0], title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
                 drive_link: rowData[4], description: rowData[5] 
             });
         } else if (tableName === 'Assignments') {
             await supabaseClient.from('assignments').insert({ 
-                title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
-                due_date: rowData[4] || null 
+                id: rowData[0], title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
+                due_date: rowData[4] || null,
+                is_active: rowData[5] === 'Active'
             });
         }
         return "Success";
