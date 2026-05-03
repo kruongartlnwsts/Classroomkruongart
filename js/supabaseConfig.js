@@ -5,3 +5,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Initialize the Supabase Client
 window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Google Apps Script Web App URL for Google Drive Uploads
+window.GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz5cLwRIGnXvuxU2KwN6jN4Re4K-Sd7G4C1mmKabUz5aUCmFe5IjstChGgNHhQj9Abb/exec';
