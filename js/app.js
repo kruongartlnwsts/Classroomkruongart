@@ -42,12 +42,15 @@
             }
         };
 
-        function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
+        function showLoading(show) { 
+            const el = document.getElementById('loadingOverlay');
+            if (el) el.style.display = show ? 'flex' : 'none'; 
+        }
 
         // ปรับแก้เพิ่มโหมด isSilently เพื่อไม่ให้ขึ้นหน้าจอดำตอนอัปเดตอัตโนมัติ
         function loadAllData(isSilently = false) {
             if (!isSilently) showLoading(true);
-            document.getElementById('errorAlert').classList.add('hidden');
+            // document.getElementById('errorAlert').classList.add('hidden'); // Removed as it doesn't exist in index.html
             google.script.run.withSuccessHandler((data) => {
                 if (!isSilently) showLoading(false);
                 if (!data) { if (!isSilently) showError("ไม่ได้รับข้อมูลจาก Server (Data is null)"); return; }
@@ -99,8 +102,12 @@
         }
 
         function showError(msg) {
-            document.getElementById('errorAlert').classList.remove('hidden');
-            document.getElementById('errorMessage').innerText = msg;
+            Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: msg,
+                confirmButtonColor: 'var(--theme1)'
+            });
         }
 
         function renderUI() {

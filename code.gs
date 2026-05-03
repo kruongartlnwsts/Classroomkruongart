@@ -3,11 +3,33 @@
  * Developer: ครูองอาจ อินต๊ะวงค์
  */
 
+const SUPABASE_URL = 'https://gmoullxfmfauwubtruji.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdtb3VsbHhmbWZhdXd1YnRydWppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTk5NzUsImV4cCI6MjA5MzE5NTk3NX0.6RcXFN31PEt29sMex3Oc2u8Z6po48gd9c9VnO-io684';
+
 function doGet() {
   return HtmlService.createTemplateFromFile('index').evaluate()
       .setTitle('ระบบส่งงานออนไลน์ - โรงเรียนบ้านสันติสุข')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    if (action === 'uploadSubmission') {
+      const result = uploadSubmission(data);
+      return ContentService.createTextOutput(JSON.stringify({ result: result }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid Action' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doSetup() {
@@ -440,6 +462,31 @@ function uploadSubmission(formObject) {
       '', 
       '' 
     ]);
+
+    // --- 3. Sync to Supabase ---
+    try {
+      const supabasePayload = {
+        assignment_id: formObject.assignmentId,
+        student_id: formObject.studentId,
+        file_url: file.getUrl()
+      };
+      
+      const supabaseOptions = {
+        method: 'post',
+        contentType: 'application/json',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY
+        },
+        payload: JSON.stringify(supabasePayload),
+        muteHttpExceptions: true
+      };
+      
+      const response = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/submissions', supabaseOptions);
+      console.log("Supabase Sync Response: " + response.getContentText());
+    } catch (supabaseErr) {
+      console.log("Supabase Sync Error: " + supabaseErr.toString());
+    }
 
     return "Success";
 
