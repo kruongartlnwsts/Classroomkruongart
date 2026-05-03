@@ -1,42 +1,43 @@
 // Mock Google Apps Script Interface using Supabase
-window.google = {
-    script: {
-        run: {
-            withSuccessHandler: function(onSuccess) { return this._createChain(onSuccess, null); },
-            withFailureHandler: function(onFailure) { return this._createChain(null, onFailure); },
-            _createChain: function(onSuccess, onFailure) {
-                const chain = {
-                    withSuccessHandler: function(cb) { onSuccess = cb; return chain; },
-                    withFailureHandler: function(cb) { onFailure = cb; return chain; }
-                };
-                
-                const methods = [
-                    'getAllData', 'uploadSubmission', 'checkAdminPassword', 'saveWorksheet', 
-                    'deleteRow', 'saveExam', 'saveQuestion', 'submitExam', 'unlockExam',
-                    'deleteSubmission', 'addAssignment', 'updateAssignment', 'updateScore',
-                    'updateMultipleScoresAndFeedback', 'updateMultipleScores',
-                    'saveGeminiKey', 'saveFolderID', 'changePassword', 'analyzeSubmissionWithGemini',
-                    'generateReport', 'saveMultipleQuestions', 'addClass', 'addStudent', 'importCSV',
-                    'updatePassword', 'addRow', 'updateFolderId', 'updateGeminiApiKey'
-                ];
+(function() {
+    const methods = [
+        'getAllData', 'uploadSubmission', 'checkAdminPassword', 'saveWorksheet', 
+        'deleteRow', 'saveExam', 'saveQuestion', 'submitExam', 'unlockExam',
+        'deleteSubmission', 'addAssignment', 'updateAssignment', 'updateScore',
+        'updateMultipleScoresAndFeedback', 'updateMultipleScores',
+        'saveGeminiKey', 'saveFolderID', 'changePassword', 'analyzeSubmissionWithGemini',
+        'generateReport', 'saveMultipleQuestions', 'addClass', 'addStudent', 'importCSV',
+        'updatePassword', 'addRow', 'updateFolderId', 'updateGeminiApiKey', 'updateStudent'
+    ];
 
-                methods.forEach(method => {
-                    chain[method] = async function(...args) {
-                        try {
-                            const result = await backendMocks[method](...args);
-                            if (onSuccess) onSuccess(result);
-                        } catch (err) {
-                            if (onFailure) onFailure(err);
-                            else console.error("Unhandled Backend Error in " + method + ":", err);
-                        }
-                    };
-                });
-                
-                return chain;
-            }
-        }
+    function createRunner(onSuccess, onFailure) {
+        const runner = {};
+        methods.forEach(method => {
+            runner[method] = async function(...args) {
+                try {
+                    const result = await backendMocks[method](...args);
+                    if (onSuccess) onSuccess(result);
+                } catch (err) {
+                    if (onFailure) onFailure(err);
+                    else console.error("Unhandled Backend Error in " + method + ":", err);
+                }
+            };
+        });
+        runner.withSuccessHandler = function(callback) {
+            return createRunner(callback, onFailure);
+        };
+        runner.withFailureHandler = function(callback) {
+            return createRunner(onSuccess, callback);
+        };
+        return runner;
     }
-};
+
+    window.google = {
+        script: {
+            run: createRunner()
+        }
+    };
+})();
 
 const backendMocks = {
     getAllData: async () => {
@@ -267,8 +268,18 @@ const backendMocks = {
                 title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
                 drive_link: rowData[4], description: rowData[5] 
             });
+        } else if (tableName === 'Assignments') {
+            await supabaseClient.from('assignments').insert({ 
+                title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
+                due_date: rowData[4] || null 
+            });
         }
         return "Success";
+    },
+
+    updateStudent: async (studentId, name, classId) => {
+        await supabaseClient.from('students').update({ name, class_id: classId }).eq('id', studentId);
+        return "Updated";
     },
 
     generateReport: async (classId, type) => {
