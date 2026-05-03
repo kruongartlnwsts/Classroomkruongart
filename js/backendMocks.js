@@ -94,24 +94,23 @@ const backendMocks = {
             if (new Date() > dueDate) return "ERROR_LATE";
         }
 
-        const fileExt = formObject.fileName.split('.').pop();
-        const pathName = `${formObject.className}/${formObject.studentName}/${Date.now()}_${formObject.assignmentTitle}.${fileExt}`;
-        
-        const base64Response = await fetch(formObject.fileData);
-        const blob = await base64Response.blob();
+        // Upload to Google Drive via GAS Web App
+        const gasResponse = await fetch(window.GAS_WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'uploadFile',
+                formObject: formObject
+            })
+        });
 
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage
-            .from('submissions')
-            .upload(pathName, blob, { upsert: true });
+        const gasResult = await gasResponse.json();
+        if (gasResult.error) throw new Error(gasResult.error);
 
-        if (uploadError) throw new Error(uploadError.message);
-
-        const { data: publicUrlData } = supabaseClient.storage.from('submissions').getPublicUrl(pathName);
-
+        // Save metadata to Supabase
         const { error: insertError } = await supabaseClient.from('submissions').insert({
             assignment_id: formObject.assignmentId,
             student_id: formObject.studentId,
-            file_url: publicUrlData.publicUrl
+            file_url: gasResult.url
         });
 
         if (insertError) throw new Error(insertError.message);
