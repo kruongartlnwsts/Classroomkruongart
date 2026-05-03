@@ -67,7 +67,8 @@ const backendMocks = {
     },
     
     checkAdminPassword: async (inputPass) => {
-        const { data } = await supabaseClient.from('config').select('value').eq('key', 'admin_password').single();
+        const { data, error } = await supabaseClient.from('config').select('value').eq('key', 'admin_password').maybeSingle();
+        if (error) { console.error("Error checking password:", error); return false; }
         return data && data.value === inputPass;
     },
     
@@ -85,7 +86,8 @@ const backendMocks = {
         
         if (existing && existing.length > 0) return "ERROR_DUPLICATE";
 
-        const { data: assign } = await supabaseClient.from('assignments').select('due_date').eq('id', formObject.assignmentId).single();
+        const { data: assign, error: assignError } = await supabaseClient.from('assignments').select('due_date').eq('id', formObject.assignmentId).maybeSingle();
+        if (assignError || !assign) { console.error("Assignment not found"); return "Error: Assignment not found"; }
         if (assign && assign.due_date) {
             const dueDate = new Date(assign.due_date);
             dueDate.setHours(23, 59, 59, 999);
