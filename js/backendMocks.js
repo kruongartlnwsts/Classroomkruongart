@@ -43,27 +43,36 @@ const backendMocks = {
     getAllData: async () => {
         const fetchTable = async (table) => {
             const { data, error } = await supabaseClient.from(table).select('*');
-            if (error) { console.error('Error fetching ' + table, error); return []; }
+            if (error) { console.error(`Error fetching ${table}:`, error); return []; }
             return data;
         };
 
-        const [config, classes, students, subjects, assignments, submissions, exams, questions, results, worksheets] = await Promise.all([
-            fetchTable('config'), fetchTable('classes'), fetchTable('students'), fetchTable('subjects'),
-            fetchTable('assignments'), fetchTable('submissions'), fetchTable('exams'), fetchTable('questions'),
-            fetchTable('exam_results'), fetchTable('worksheets')
+        const [classesRaw, studentsRaw, subjectsRaw, assignmentsRaw, submissionsRaw, examsRaw, questionsRaw, examResultsRaw, worksheetsRaw, configRaw] = await Promise.all([
+            fetchTable('classes'), fetchTable('students'), fetchTable('subjects'), fetchTable('assignments'),
+            fetchTable('submissions'), fetchTable('exams'), fetchTable('questions'), fetchTable('exam_results'),
+            fetchTable('worksheets'), fetchTable('config')
         ]);
-        
+
+        const transform = (raw, mapping) => raw.map(item => mapping.map(key => {
+            let val = item[key];
+            if (val && (key === 'created_at' || key === 'due_date')) {
+                // Format date as YYYY-MM-DD
+                return new Date(val).toISOString().split('T')[0];
+            }
+            return val !== undefined ? val : "";
+        }));
+
         return {
-            config: config.map(c => [c.key, c.value]),
-            classes: classes.map(c => [c.id, c.name]),
-            students: students.map(s => [s.id, s.name, s.class_id]),
-            subjects: subjects.map(s => [s.id, s.name]),
-            assignments: assignments.map(a => [a.id, a.title, a.subject_id, a.class_id, a.due_date, a.active]),
-            submissions: submissions.map(s => [s.id, s.assignment_id, s.student_id, s.file_url, s.created_at, s.score, s.feedback]),
-            exams: exams.map(e => [e.id, e.title, e.subject_id, e.class_id, e.max_questions, e.active]),
-            questions: questions.map(q => [q.id, q.exam_id, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.answer]),
-            examResults: results.map(r => [r.id, r.exam_id, r.student_id, r.score, r.created_at, r.is_locked]),
-            worksheets: worksheets.map(w => [w.id, w.title, w.subject_id, w.class_id, w.drive_link, w.description, w.created_at])
+            classes: transform(classesRaw, ['id', 'name']),
+            students: transform(studentsRaw, ['id', 'name', 'class_id']),
+            subjects: transform(subjectsRaw, ['id', 'name']),
+            assignments: transform(assignmentsRaw, ['id', 'title', 'subject_id', 'class_id', 'due_date', 'is_active']),
+            submissions: transform(submissionsRaw, ['id', 'assignment_id', 'student_id', 'file_url', 'created_at', 'score', 'feedback']),
+            exams: transform(examsRaw, ['id', 'title', 'subject_id', 'class_id', 'max_questions', 'is_active']),
+            questions: transform(questionsRaw, ['id', 'exam_id', 'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'answer']),
+            examResults: transform(examResultsRaw, ['id', 'exam_id', 'student_id', 'score', 'created_at', 'is_locked']),
+            worksheets: transform(worksheetsRaw, ['id', 'title', 'subject_id', 'class_id', 'drive_link', 'description', 'created_at']),
+            config: configRaw.map(c => [c.key, c.value])
         };
     },
     
