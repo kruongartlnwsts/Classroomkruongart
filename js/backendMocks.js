@@ -17,7 +17,7 @@ window.google = {
                     'updateMultipleScoresAndFeedback', 'updateMultipleScores',
                     'saveGeminiKey', 'saveFolderID', 'changePassword', 'analyzeSubmissionWithGemini',
                     'generateReport', 'saveMultipleQuestions', 'addClass', 'addStudent', 'importCSV',
-                    'updatePassword'
+                    'updatePassword', 'addRow'
                 ];
 
                 methods.forEach(method => {
@@ -242,6 +242,22 @@ const backendMocks = {
             exam_id: examId, question_text: q.text, option_a: q.a, option_b: q.b, option_c: q.c, option_d: q.d, answer: q.ans
         }));
         await supabaseClient.from('questions').insert(inserts);
+        return "Success";
+    },
+
+    addRow: async (tableName, rowData) => {
+        if (tableName === 'Classes') {
+            await supabaseClient.from('classes').insert({ name: rowData[1] });
+        } else if (tableName === 'Students') {
+            await supabaseClient.from('students').insert({ name: rowData[1], class_id: rowData[2] });
+        } else if (tableName === 'Subjects') {
+            await supabaseClient.from('subjects').insert({ name: rowData[1] });
+        } else if (tableName === 'Worksheets') {
+            await supabaseClient.from('worksheets').insert({ 
+                title: rowData[1], subject_id: rowData[2], class_id: rowData[3], 
+                drive_link: rowData[4], description: rowData[5] 
+            });
+        }
         return "Success";
     },
 
